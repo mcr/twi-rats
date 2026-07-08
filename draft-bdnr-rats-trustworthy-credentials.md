@@ -107,40 +107,18 @@ In this world, the Attester uses Remote Attestation to obtain from the RATS Rely
 
 This document details an architecture by which legacy Identity Document issuance mechanisms are replaced with identical Identity Documents issued, but with the additional prerequisite of successful Remote Attestation of the workloads in question.
 
-## Assumptions about Workload Immutability
+## Reasons for RATS Unaware Relying Party Immutability
 
-While updates and upgrades to the workload and the RATS Unaware Party to add a Remote Attestation capability are not possible in this environment, some changes to the Attesting environment are required in order to do anything.
+The most important and most common scenario addressed here is that of a workload that employs Remote Attestation but whose Relying Party has no capacity to process Attestation Results or execute Appraisal Policy for Attestation Results.
+This RATS Unaware Relying Party is typically unable to make the corresponding changes for a number of reasons:
 
-The assumption is that the workload may be a compiled object or container provided by a third party.
-Or the workload may be in a language not easily changed or upgraded with new capabilities.
-At an extreme example, it could be an ancient COBOL program compiled into a WASM object, perhaps connected to the network via virtual paper-tape and virtual printer interfaces.
-Further, such a system may require extensive and significant review by an authority before changes to the core algorithm can be made.
+* It may be a compiled object or container provided by a third party.
+* Or it may be implemented in a language not easily changed or upgraded with new capabilities.
+* Or, as an extreme example, it could be an ancient COBOL program compiled into a WASM object, perhaps connected to the network via virtual paper-tape and virtual printer interfaces.
+* Further, such a system may require extensive and significant review by an authority before changes to the core algorithm can be made.
+* Or, finally, the reluctance to change may come from organizational friction within an enterprise where the remotely attesting workload is organizationally separate from its Relying Party and different priorities of different parts of organization prevent them moving in lockstep.
 
-These workloads run in a virtual machine (VM with unique kernel), or in a containerized environment (common kernel).
-They never run on bare hardware, and there is a hypervisor and/or orchestration environment that arranges the workload and any needed configurations.
-
-However, it is assumed that some the following changes *can* be made:
-
-* network connections use mutual TLS, and the origin of the keypair used for client authentication can be changed or configured by an operator
-
-* the TLS code, while built-in to the application, can be configured to use a Secure Element or TPM as the source for the private key.  Current TLS stacks such as OpenSSL can be configured to use `engines` or `providers` to do asymmetric operations, and providers exist that talk to a TPM for all private key operations.
-
-* in the case of bearer token authentication, that the token can be configured external to the code
-
-* that other components or configurations can be added to the execution environment by the operator
-
-* that the orchestration environment can be extended with new capabilities without affecting the workload itself
-
-
-## Hostile Regulator
-
-A motivating factor in this work is that there are workloads that are mandated to operate in specific geographies under inspection by a local authority.
-The inspection process by the regulator may include agents that must run within the secured environment, where it may examine inputs and outputs to the workload.
-These agents do not have the full trust of the workload owners or RATS Unaware Party.
-
-The trustworthiness of the workload is not absolute (no trust ever is), however there is a need to provide assurance that only the regulator's agent is present, and no additional malware has been introduced.
-(For instance, the agent may have exploits known to additional parties, not yet revealed or fixed by the regulator)
-
+In all of these cases, it is assumed that the remotely attesting workload can make the necessary changes to perform remote attestation, and that interoperability with the RUP will be preserved so long as the key or credential obtained by the workload following Remote Attestation matches that expected by the RUP.
 
 # Conventions and Definitions
 {: #definitions }
@@ -182,7 +160,7 @@ Verifier:
 
 A newly created workload connects to the Credential Broker to obtain a set of credentials to be used to perform its functions.
 
-Within this connection, Evidence is transferred to the Credential Broker to demonstrate the workloads' trusthworthiness.
+Within this connection, Evidence is transferred to the Credential Broker to demonstrate the workload's trusthworthiness.
 The Credential Broker is acting as a RATS Relying Party, the workload is the Attester.
 The Credential Broker contacts (using the background check model), a Verifier that it trusts in order to evaluate the Evidence, obtaining an Attestation Result.
 
