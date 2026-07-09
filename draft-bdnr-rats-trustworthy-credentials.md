@@ -102,7 +102,7 @@ For that, a mechanism is required by means of which a Credential Broker, a Key B
 This provides an intermediation between Attestation Results, expressed using formats such as EAT and AR4SI, and the RATS-Unaware Relying Parties whose authentication and authorization policies may precede the introduction of Remotely Attestable Workloads and remain static for long periods of time.
 
 For the RATS-Unaware Relying Parties, these adoption barriers are eliminated, as these RUPs are capable of authenticating their clients utilizing appropriate Identity Documents.
-This includes shared symmetric keys (bearer tokens), credentials including PKIX certificates {{!RFC5280}}, JWTs {{!RFC7515}}, or WIMSE WITs {{!I-D.ietf-wimse-workload-creds}}.
+This includes shared symmetric keys, bearer tokens, credentials including PKIX certificates {{!RFC5280}}, JWTs {{!RFC7515}}, or WIMSE WITs {{!I-D.ietf-wimse-workload-creds}}.
 In this world, the Attester uses Remote Attestation to obtain from the RATS Relying Party a key, token or credential that is compatible with the RUP.
 
 This document details an architecture by which legacy Identity Document issuance mechanisms are replaced with identical Identity Documents issued, but with the additional prerequisite of successful Remote Attestation of the workloads in question.
@@ -118,7 +118,7 @@ This RATS Unaware Relying Party is typically unable to make the corresponding ch
 * Further, such a system may require extensive and significant review by an authority before changes to the core algorithm can be made.
 * Or, finally, the reluctance to change may come from organizational friction within an enterprise where the remotely attesting workload is organizationally separate from its Relying Party and different priorities of different parts of organization prevent them moving in lockstep.
 
-In all of these cases, it is assumed that the remotely attesting workload can make the necessary changes to perform remote attestation, and that interoperability with the RUP will be preserved so long as the key or credential obtained by the workload following Remote Attestation matches that expected by the RUP.
+In all of these cases, it is assumed that the remotely attesting workload can make the necessary changes to perform remote attestation, and that interoperability with the RUP will be preserved so long as the key, token, or credential obtained by the workload following Remote Attestation matches that expected by the RUP.
 
 # Conventions and Definitions
 {: #definitions }
@@ -158,15 +158,14 @@ Verifier:
 
 # Overview of Mechanism
 
-A newly created workload connects to the Credential Broker to obtain a set of credentials to be used to perform its functions.
+A newly created workload connects to the Credential Broker (which may also act as a Key Broker or a Credential Authority) to obtain a set of credentials to be used to perform its functions.
 
-Within this connection, Evidence is transferred to the Credential Broker to demonstrate the workload's trusthworthiness.
+The proposed mechanism works equally well with Background Check and Passport models of RATS.
 The Credential Broker is acting as a RATS Relying Party, the workload is the Attester.
-The Credential Broker contacts (using the background check model), a Verifier that it trusts in order to evaluate the Evidence, obtaining an Attestation Result.
 
-Figure {{credential-arch}} extends the {{-RATS}} architecture to show how the workload and credential broker take on the roles of Attester and Relying Party.
+Figure {{credential-arch}} extends the {{-RATS}} architecture to show how the workload and Credential Broker take on the roles of Attester and Relying Party.
 
-If the Attestation Result is acceptable, then the Credential Broker provides the set of credentials that the workload needs to accomplish its task.
+If the Attestation Result is acceptable, then the Credential Broker provides the keys, tokens or credentials that the workload needs to accomplish its task.
 
 ~~~ aasvg
 {::include credential_architecture.txt}
@@ -183,8 +182,8 @@ Some workloads might use a few of each, possibly with each one being used with a
 2. The Credential Broker is a respository for a credential issued by another Identity Provider (IdP).
 The Credential Broker has both the private key (encrypted) and the certificate, and it discloses these to trustworthy workloads by returning them in a unique encryption, bound to the workload identity.
 
-3. The Credential Broker is a resposity for a bearer token issued by a Resource Owner, or a Workload Identity Tokens (WITs) defined in Section 3.1 of {{-WIMSEID}}.
-The Credential Broker discloses this to trustworthy workloads by returning them in a unique encryption, bound to the workload identity.
+3. The Credential Broker is a resposity for bearer tokens issued by a Resource Owner, or a Workload Identity Tokens (WITs) defined in Section 3.1 of {{-WIMSEID}}.
+The Credential Broker discloses this to trustworthy workloads by returning them encrypted to keys held securely inside the attesting workload.
 
 The use of a shared assymetric private key is unorthodox.
 This architecture is justified by the need to rapidly scale the number of workers and to recover from hardware or network failures.
@@ -195,17 +194,41 @@ The patterns of communication shown in figure {{credential-arch}} are designed s
 
 ## Deployment of Credentials
 
-Workloads are expected to include a (virtual) Trusted Platform Module (TPM) (or equivalent) by which they will collect and sign Evidence to be used in the Remote Attestation process.
-
-The credential that will be shared by the Credential Broker will be encrypted to a key involved in the Remote Attestation process.
-The most natural mechanism is to encrypt to a key that is available only to the TPM.
-The credential are then decrypted by the TPM, and the keypair can then be made available to the workload, while never permitting the workload to ever see the key.
-
-In this way, a workload that be designed to do mutual TLS using a client-certificate, and for which the location of the private key can be configured to be in a TPM, can be adapted to the mechanism described in this document without any significant change to the workload itself.
+Workloads are expected to include a (virtual) Trusted Platform Module (TPM), a Trusted Execution Environment, or equivalent, by which they will collect and sign Evidence to be used in the Remote Attestation process. Workloads are capable of generating and attesting asymmetric encryption or signing keys, the private portions of which never leave the workload, and are thus safe to use to deliver secret information to the workload with full knowledge that no other workload can make make use of these secrets.
 
 # Details of protocol
 
 As there are three major types of credentials that may be used, it is not unreasonable that they may get provisioned in different ways, using different protocols.
+
+However, when time comes for the workload to request the identity documents, one of three possibilities arise:
+
+1. A cryptographic key encrypted to an attested, Attester-held asymmetric Key Encryption Key
+2. A proof-of-possession credential and a corresponding Credential Signing Key encrypted to an attested, Attester-held asymmetric Key Encryption Key
+3. A freshly minted proof-of-possession credential matching an attested, Attester-held asymmetric Credential Signing Key, or a newly minted short-lived bearer token encrypted to an attested, Attester-held asymmetric Token Encryption Key
+
+| Variant | Workload Generates and Attests | Credential Broker Returns |
+|---------|--------------------------------|---------------------------|
+| 1a: Key Broker for proof-of-possession Keys (PPC) | Asymmetric Key Encryption Key (KEK) | Credential Signing Key (CSK) matching PPC, encyprted with the KEK |
+| 1b: Key Broker for shared keys | Asymmetric Key Encryption Key (KEK) | Secret Preshared Key (SPK), encrypted with the KEK |
+| 2: Credential Broker for proof-of-possession credentials | Asymmetric Key Encryption Key (KEK) | Proof-of-Possession Credential (PPC) and Credential Signing Key (CSK) for PPC, Encrypted with the KEK |
+| 3a: Credential Authority for proof-of-possession credentials | Asymmetric Credential Signing Key (CSK) | Newly minted proof-of-possession credential matching the CSK |
+| 3b: Credential Authority for short-lived bearer tokens | Asymmetric Token Encryption Key (TEK) | Newly minted short-lived bearer token encrypted with the TEK |
+
+These are explained in more detail below:
+
+## Variant 1: Key Broker Mode
+
+The Attester generates an asymmetric Key Encryption Key (KEK), and includes its public portion in Evidence during Remote Attestation. The Attester receives from the RATS Relying Party a Secret Key encrypted to the KEK. That Secret Key could be an asymmetric Credential Signing Key for a proof-of-possession credential, such as an x.509 certificate, that is pre-provisioned to the Attester (Variant 1a), or a symmetric key for preshared key scenarios (Variant 1b).
+
+## Variant 2: Credential Broker Mode
+
+The Attester generates an asymmetric Key Encryption Key (KEK), and includes its public portion in Evidence during Remote Attestation. The Attester receives from the RATS Relying Party a pre-provisioned Credential (a WIT or an x.509 certificate) together with its corresponding Credential Signing Key encrypted to the KEK.
+
+## Variant 3: Credential Authority Mode
+
+In Variant 3a, which is similar to the Attested CSR protocol, the Attester generates an asymmetric Credential Signing Key (CSK), and includes its public portion in Evidence during Remote Attestation. The RATS Relying Party, acting as a Credential Authority, mints a brand new proof-of-possession credential and returns it to the Attester.
+
+In Variant 3b, the Attester generates an asymmetric Token Encryption Key (TEK), and includes its public portion in Evidence during Remote Attestation. The RATS Relying Party, acting as a Credential Authority, mints a brand new short-lived bearer token (e.g. a JWT), encrypts it with the TEK, and returns the encrypted bearer token to the Attester.
 
 ## Use of Enrollment over Secure Transport (EST)
 
