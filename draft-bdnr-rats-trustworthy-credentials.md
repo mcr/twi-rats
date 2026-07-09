@@ -132,6 +132,12 @@ The definitions of terms like Trustworthy Workload Identity and Workload Credent
 Broker:
 : an entity that deals out pre-existing keys or credentials. Constrast to a Credential Authority which mints new credentials.
 
+Identity Document:
+: a catch-all term for any type of key, token, or credential that is used by the attesting workload to authenticate to the RATS Unaware Relying party.
+
+Identity Document Service:
+: a catch-all term for a service that acts as a Key/Token Broker, Credential Broker, or Credential Authority, that the attesting workload uses to obtain its identity documents following successful remote attestation.
+
 RUP:
 : The RATS Unaware Relying Party (RUP).  A target service that interacts with many clients based upon credentials provided. This is sometimes called the Collaborating Party.
 
@@ -158,14 +164,16 @@ Verifier:
 
 # Overview of Mechanism
 
-A newly created workload connects to the Credential Broker (which may also act as a Key Broker or a Credential Authority) to obtain a set of credentials to be used to perform its functions.
+A newly created workload connects to the Identity Document Service (IDS) to obtain a set of Identity Documents to be used to perform its functions.
 
 The proposed mechanism works equally well with Background Check and Passport models of RATS.
-The Credential Broker is acting as a RATS Relying Party, the workload is the Attester.
+The IDS is acting as a RATS Relying Party, the workload is the Attester.
 
-Figure {{credential-arch}} extends the {{-RATS}} architecture to show how the workload and Credential Broker take on the roles of Attester and Relying Party.
+Figure {{credential-arch}} extends the {{-RATS}} architecture to show how the workload and IDS take on the roles of Attester and Relying Party.
+Note in particular that no changes are made to the RATS Architecture; the only change is that the RATS Relying Party is now acting as the IDS,
+and not the ultimate destination for workload's authentication.
 
-If the Attestation Result is acceptable, then the Credential Broker provides the keys, tokens or credentials that the workload needs to accomplish its task.
+If the Attestation Result is acceptable, then the IDS returns the Identity Document that the workload needs to accomplish its task.
 
 ~~~ aasvg
 {::include credential_architecture.txt}
@@ -177,15 +185,12 @@ If the Attestation Result is acceptable, then the Credential Broker provides the
 There are three kinds of credentials that can be involved.
 Some workloads might use a few of each, possibly with each one being used with a different RATS Unaware Party.
 
-1. The Credential Broker is also an Identity Provider (IdP), and acts as an Registration Authority (possibly including the Certification Authority).  It issues new credentials in the form of PKIX certificates to each trustworthy workload.
+1. The IDS is also an Identity Provider (IdP), and acts as an Registration Authority (possibly including the Certification Authority). It issues new credentials in the form of PKIX certificates or WIMSE WITs to each trustworthy workload, based on attested workload-held private keys.
 
-2. The Credential Broker is a respository for a credential issued by another Identity Provider (IdP).
-The Credential Broker has both the private key (encrypted) and the certificate, and it discloses these to trustworthy workloads by returning them in a unique encryption, bound to the workload identity.
+2. The IDS is a respository for Identity Documents issued by another Identity Provider (IdP).
+The IDS has both the private key (encrypted) and the proof-of-possession credential, and it discloses these to trustworthy workloads by returning them in a manner that ensures that only authorized workloads can decrypt the private key, typically by encrypting them to an attested, attester-held asymmetric encryption key.
 
-3. The Credential Broker is a resposity for bearer tokens issued by a Resource Owner, or a Workload Identity Tokens (WITs) defined in Section 3.1 of {{-WIMSEID}}.
-The Credential Broker discloses this to trustworthy workloads by returning them encrypted to keys held securely inside the attesting workload.
-
-The use of a shared assymetric private key is unorthodox.
+The use of a shared assymetric private keys as identity documents is unorthodox.
 This architecture is justified by the need to rapidly scale the number of workers and to recover from hardware or network failures.
 The alternatives is that external Identity Providers would need to be willing to respond to spikes of hundreds of credential requests within a small period of time.
 This would look like a denial of service attack, and it may also require additional human authorization for each.
@@ -194,20 +199,21 @@ The patterns of communication shown in figure {{credential-arch}} are designed s
 
 ## Deployment of Credentials
 
-Workloads are expected to include a (virtual) Trusted Platform Module (TPM), a Trusted Execution Environment, or equivalent, by which they will collect and sign Evidence to be used in the Remote Attestation process. Workloads are capable of generating and attesting asymmetric encryption or signing keys, the private portions of which never leave the workload, and are thus safe to use to deliver secret information to the workload with full knowledge that no other workload can make make use of these secrets.
+Workloads are expected to include a (virtual) Trusted Platform Module (TPM), a Trusted Execution Environment, or equivalent, by which they will generate collect and sign Evidence to be used in the Remote Attestation process.
+Workloads are also assumed capable of generating and attesting (including in Evidence) asymmetric encryption or signing keys, the private portions of which never leave the workload, and thus guarantee that no other workload can make make use of these secrets.
 
 # Details of protocol
 
 As there are three major types of credentials that may be used, it is not unreasonable that they may get provisioned in different ways, using different protocols.
 
-However, when time comes for the workload to request the identity documents, one of three possibilities arise:
+However, when time comes for the workload to request the Identity Documents, one of three possibilities arise:
 
-1. A cryptographic key encrypted to an attested, Attester-held asymmetric Key Encryption Key
-2. A proof-of-possession credential and a corresponding Credential Signing Key encrypted to an attested, Attester-held asymmetric Key Encryption Key
-3. A freshly minted proof-of-possession credential matching an attested, Attester-held asymmetric Credential Signing Key, or a newly minted short-lived bearer token encrypted to an attested, Attester-held asymmetric Token Encryption Key
+1. (Key Broker mode) A cryptographic key encrypted to an attested, Attester-held asymmetric Key Encryption Key
+2. (Credential Broker mode) A proof-of-possession credential and a corresponding Credential Signing Key encrypted to an attested, Attester-held asymmetric Key Encryption Key
+3. (Identity Provider mode) A freshly minted proof-of-possession credential matching an attested, Attester-held asymmetric Credential Signing Key, or a newly minted short-lived bearer token encrypted to an attested, Attester-held asymmetric Token Encryption Key
 
-| Variant | Workload Generates and Attests | Credential Broker Returns |
-|---------|--------------------------------|---------------------------|
+| Variant | Workload Generates and Attests | IDS Returns |
+|---------|--------------------------------|-------------|
 | 1a: Key Broker for proof-of-possession Keys (PPC) | Asymmetric Key Encryption Key (KEK) | Credential Signing Key (CSK) matching PPC, encyprted with the KEK |
 | 1b: Key Broker for shared keys | Asymmetric Key Encryption Key (KEK) | Secret Preshared Key (SPK), encrypted with the KEK |
 | 2: Credential Broker for proof-of-possession credentials | Asymmetric Key Encryption Key (KEK) | Proof-of-Possession Credential (PPC) and Credential Signing Key (CSK) for PPC, Encrypted with the KEK |
@@ -253,7 +259,7 @@ There are three ways to handle the Evidence:
 
 * within TLS itself, using for instance, {{?I-D.fossati-seat-expat}}, or whichever protocol the SEAT WG standardizes
 
-### Credential Broker as Secure Repository
+### Identity Document Service as Secure Repository
 
 EST is used by the hypervisor (or container orchestrator) to connect to the Secure Repository
 The EST protocol is extended to include transmission of Evidence from the Attester to the Secure Repository.
