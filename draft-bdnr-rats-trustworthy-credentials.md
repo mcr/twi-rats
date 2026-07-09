@@ -148,7 +148,7 @@ Workload Credential:
 : an ephemeral identity document containing an identity and a number of additional claims, that can be short-lived or long-lived, and that is used to access a service
 
 Proof of possession credential:
-: this is a credential, such as a JWT, that contains no other identity or authorization claims.  It is trusted by the RUP due to local policy.
+: this is a credential, such as an x.509 certificate or a WIMSE WIT, that requires proof of possession (typically an asymmetric signing key) to us. It is considered public information -- the secrecy is in the associated signing key.
 
 Collaborating Party:
 : see RUP.
