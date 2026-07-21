@@ -238,52 +238,41 @@ In Variant 3b, the Attester generates an asymmetric Token Encryption Key (TEK), 
 
 ## Use of Enrollment over Secure Transport (EST)
 
-EST ({{RFC7030}}) describes a mechanism to enroll with a certification authority using a TLS secured HTTP based protocol.
+EST ({{RFC7030}}) describes a mechanism to obtain a credential and/or a corresponding credential signing key using TLS over HTTP.
+A few changes are needed to make EST suitable for handling workloads capable of Remote Attestation.
+In all cases below the EST client hosts the workload, but is not assumed to be inside the workload's TCB.
+This EST client might be the workload's hypervisor, a container orchestrator, or some other workload hosting environment.
+Use of authentication by this EST client is OPTIONAL.
+Even if used, client authentication MUST NOT be used to establish the identity of the workload for purposes of deciding which key, token or credential to return to it.
+The EST server acts as a RATS Relying Party in Background Check mode.
+The Evidence is submitted by the workload to the EST server by the EST client acting on its behalf.
+There are three ways to submit the Evidence:
 
-### Credential Broker as Identity Provider
+1. Via a new, Remote Attestation extension to EST
 
-EST is used by the hypervisor (or container orchestrator) to connect to the Identity Provider.
-The EST protocol is extended to include transmission of Evidence from the Attester to the Identity Provider.
-This Identity Provider acts as a RATS Relying Party, in Background-Check mode.
-The Evidence is passed to an appropriately trusted Verifier, and evaluated.
+2. Using {{!I-D.ietf-lamps-csr-attestation}} extensions to the CSR itself
 
-Based upon the Attestation Results, the Identity Provide then allows the hypervisor to use the EST /simpleenroll mechanism to provide a CSR, and retrieve an appropriate certificate.
-The private key for the certificate can be generated within a TPM, never to leave.
-The hypervisor then inserts the certificate into an appropriate place for inline transmission by mutual TLS.
+3. Within TLS itself, using for instance, {{?I-D.fossati-seat-expat}}, or whichever protocol the SEAT WG standardizes (in this case, the workload becomes the EST client)
 
-There are three ways to handle the Evidence:
+This Evidence is passed by the EST server to a Verifier, and Attestation Results returned by the Verifier are used to establish the identity of the workload.
 
-* via a new, Remote Attestation extension to EST
+### Using EST to Mint New Proof-of-Possession Credentials
 
-* using {{!I-D.ietf-lamps-csr-attestation}} extensions to the CSR itself
+The EST /simpleenroll mechanism is used.
 
-* within TLS itself, using for instance, {{?I-D.fossati-seat-expat}}, or whichever protocol the SEAT WG standardizes
-
-### Identity Document Service as Secure Repository
-
-EST is used by the hypervisor (or container orchestrator) to connect to the Secure Repository
-The EST protocol is extended to include transmission of Evidence from the Attester to the Secure Repository.
+### Using EST to Obtain Existing Keys, Tokens, or Proof-of-Possession Credentials
 
 The EST /serverkeygen mechanism is used.
 The server does not generate a fresh key, but rather retrieves the keypair (private key and certificate) from the store.
-This is encrypted back to the client using one of the mechanisms described in RFC7030.
+This is encrypted back to the client, however, mechanisms described in RFC7030 need to be modified as any secrets (keys, bearer tokens) must be returned to an attested, attester (workload)-held asymmetric encryption key, not to the EST client directly.
 (TBD: This needs more detail, particularly for the mTLS used in the EST)
-
-As before, there are three possible ways to transmit the Evidence:
-
-* via a new, Remote Attestation extension to EST
-
-* using {{!I-D.ietf-lamps-csr-attestation}} extensions to the CSR itself.  The serverkeygen mechanism still sends a CSR, with a fake public key.
-
-* within TLS itself, using for instance, {{?I-D.fossati-seat-expat}}, or whichever protocol the SEAT WG standardizes
 
 ### Credential Broker as short-term Bearer Token issuer
 
 EST is not appropriate for this use case.
-Another protocol will be required.
+Another protocol or an extension to EST will be required.
 
 TBD.
-
 
 # Security Considerations
 
